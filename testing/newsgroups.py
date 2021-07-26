@@ -9,9 +9,11 @@ from sklearn.datasets import fetch_20newsgroups
 from sklearn.linear_model import SGDClassifier
 from sklearn.metrics import accuracy_score
 
+from config import api_key
+
 # Setting the API key (saved as environment variable)
 experiment = Experiment(
-    api_key="hSq9kNGV7JAFwudNQSDeGUzgZ",
+    api_key=api_key,
     # or
     # api_key=os.environ.get("COMET_API_KEY"),
     project_name='comet-examples')
