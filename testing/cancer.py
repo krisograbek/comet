@@ -2,10 +2,11 @@
 # import comet_ml in the top of your file
 from comet_ml import Experiment
 import os
+from ..config import api_key
 
 # Setting the API key (saved as environment variable)
 experiment = Experiment(
-    api_key="hSq9kNGV7JAFwudNQSDeGUzgZ",
+    api_key=api_key,
     # or
     # api_key=os.environ.get("COMET_API_KEY"),
     project_name='comet-examples')
