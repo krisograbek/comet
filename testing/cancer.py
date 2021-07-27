@@ -2,7 +2,7 @@
 # import comet_ml in the top of your file
 from comet_ml import Experiment
 import os
-from ..config import api_key
+from config import api_key
 
 # Setting the API key (saved as environment variable)
 experiment = Experiment(
@@ -38,7 +38,7 @@ scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
-logreg = LogisticRegression()
+logreg = LogisticRegression(C=10)
 
 param_grid = {'C': [0.001, 0.01, 0.1, 1, 5, 10, 20, 50, 100]}
 
@@ -54,6 +54,10 @@ y_pred = clf.predict(X_test_scaled)
 print("\nResults\nConfusion matrix \n {}".format(
     confusion_matrix(y_test, y_pred)))
 
+print(clf.best_params_, clf.best_estimator_)
+print("Index: ", clf.best_index_, "Score: ", clf.best_score_)
+print("All results: ", clf.cv_results_)
+
 f1 = f1_score(y_test, y_pred)
 precision = precision_score(y_test, y_pred)
 recall = recall_score(y_test, y_pred)
@@ -62,6 +66,7 @@ params = {"random_state": random_state,
           "model_type": "logreg",
           "scaler": "standard scaler",
           "param_grid": str(param_grid),
+          "best_params": clf.best_params_,
           "stratify": True
           }
 metrics = {"f1": f1,
