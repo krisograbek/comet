@@ -2,5 +2,6 @@ venv
 .vscode
 
 config.py
+matrix_pg.py
 
 __pycache__
