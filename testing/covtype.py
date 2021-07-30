@@ -1,9 +1,7 @@
 from comet_ml import Experiment
 
-import math
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.sparse.construct import rand
 from sklearn.datasets import load_wine, load_breast_cancer, fetch_covtype
 from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV, cross_val_score
 from sklearn.preprocessing import StandardScaler
