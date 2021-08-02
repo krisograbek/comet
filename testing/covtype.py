@@ -14,12 +14,15 @@ from sklearn.metrics import (accuracy_score,
     f1_score
 )
 
+from helpers import print_shapes, print_class_distribution
 from config import api_key
 
 # Setting the API key (saved as environment variable)
 # experiment = Experiment(
 #     api_key=api_key,
 #     project_name='covtype')
+
+
 
 def get_scores(y_test, y_pred):
     acc = accuracy_score(y_test, y_pred)
@@ -56,35 +59,58 @@ unique = list(np.unique(target))
 
 print("Target distribution: ", np.bincount(target) / len(target))
 
-n = 25000        # number of samples
+sample_size = 100000
+test_size, val_size = 10000, 10000
 
-def shuffle_arrays(arr1, arr2):
-    np.random.seed(32)
-    p = np.random.permutation(len(arr2))
-    # print("Shuffled indices", p[:n])
-    X = arr1[p]
-    y = arr2[p]
-    return X[:n], y[:n]
+_, X_train, _, y_train = train_test_split(data, target, stratify=target, test_size=sample_size, random_state=random_state)
+X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, stratify=y_train, test_size=test_size, random_state=random_state)
+X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, stratify=y_train, test_size=test_size, random_state=random_state)
 
-data, target = shuffle_arrays(data, target)
-# print("Shuffeled and filtered Target distribution: ", np.bincount(target) / len(target))
-
-X_train, X_test, y_train, y_test = train_test_split(data, target, test_size=2500, stratify=target, random_state=31)
-X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=2500, stratify=y_train, random_state=31)
-# print("y train class distribution: ", np.bincount(y_train) / len(y_train))
-# print("y val class distribution: ", np.bincount(y_val) / len(y_val))
+print_shapes(X_train, y_train, X_val, y_val, X_test, y_test)
+print_class_distribution(y_train, y_val, y_test)
 
 scaler = StandardScaler()
 
-X_train_scaled = scaler.fit_transform(X_train)
-X_val_scaled = scaler.transform(X_val)
-X_test_scaled = scaler.transform(X_test)
+# print(X_train[:3])
+
+X_train_scaled = scaler.fit_transform(X_train[:, :10])
+X_val_scaled = scaler.transform(X_val[:, :10])
+X_test_scaled = scaler.transform(X_test[:, :10])
+X_train_scaled = np.concatenate([X_train_scaled, X_train[:, 10:]], axis=1)
+X_val_scaled = np.concatenate([X_val_scaled, X_val[:, 10:]], axis=1)
+X_test_scaled = np.concatenate([X_test_scaled, X_test[:, 10:]], axis=1)
+
+lr = LogisticRegression()
+
+
+grid_params_lr = {
+    # 'penalty': ['l1', 'l2'], 
+    # 'C': [0.001,0.01,0.1,1,10,100,1000]
+    'C': [1, 5, 10, 20, 50]
+}
+
+# init grid search for Logistic Regression
+grid_lr = GridSearchCV(lr, grid_params_lr)
+grid_lr.fit(X_train_scaled, y_train)
+
+print("Best LogReg params:", grid_lr.best_params_)
+best_lr = grid_lr.best_estimator_
+# print("Feature importances:", np.sort(best_lr.feature_importances_))
+
+y_pred_lr = best_lr.predict(X_train_scaled)
+acc_lr, cm_lr, f1_lr, recall_lr, precision_lr = get_scores(y_train, y_pred_lr)
+print("Training scores")
+print_scores(acc_lr, cm_lr, f1_lr, recall_lr, precision_lr)
+
+print(" -- "*25)
+
+y_pred_lr = best_lr.predict(X_val_scaled)
+acc_lr, cm_lr, f1_lr, recall_lr, precision_lr = get_scores(y_val, y_pred_lr)
+print("Validation scores")
+print_scores(acc_lr, cm_lr, f1_lr, recall_lr, precision_lr)
 
 rf = RandomForestClassifier(n_estimators=10, random_state=random_state)
 sgd = SGDClassifier(random_state=random_state)
-
-lr = LogisticRegression(multi_class="multinomial")
-
 # n_epochs = 200
 # acc_train, acc_val = [], []
 
@@ -104,59 +130,6 @@ lr = LogisticRegression(multi_class="multinomial")
 # y_pred_rf = rf.predict(X_test_scaled)
 # y_probas_rf = rf.predict(X_test_scaled)
 
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
-def softmax(x):
-    return np.exp(x) / np.sum(np.exp(x))
-
-def my_decision_func(samples, coefs, intercept):
-    X = np.dot(samples, np.transpose(coefs)) + intercept
-    return X
-
-samples = 20
-X_samples = X_val_scaled[:samples]
-y_samples = y_val[:samples]
-
-print("Training Logistic Regression")
-lr.fit(X_train_scaled, y_train)
-
-testres = my_decision_func(X_samples, lr.coef_, lr.intercept_)
-# print(testres)
-
-
-y_pred_lr = lr.predict(X_val_scaled)
-dec_func_lr = lr.decision_function(X_samples)
-print("My values")
-# print("Decision Function: ", dec_func_lr)
-y_probas = lr.predict_proba(X_samples)
-y_probas_log = lr.predict_log_proba(X_samples)
-
-my_probas = softmax(testres)
-# print("Decision to softmax: ", my_probas)
-my_pred_classes = np.argmax(my_probas, axis=1)
-print("Classes from argmax(probas): ", my_pred_classes)
-print("Pred classes lr.predic(val): ", y_pred_lr[:samples])
-print("True classes: ", y_samples)
-
-print(" -- "*20)
-pred_classes = np.argmax(y_probas, axis=1)
-print("Classes from argmax(probas): ", pred_classes)
-print("Pred classes lr.predic(val): ", y_pred_lr[:samples])
-print("True classes: ", y_samples)
-# print()
-assert False
-
-good_pred = np.array(pred_classes == y_samples).astype(int)
-print(good_pred)
-acc = np.sum(good_pred) / samples
-print("Acc: ", acc)
-
-# print("Coef_ and intercept", lr.coef_, lr.intercept_)
-print("Coef_ and intercept", lr.coef_.shape, lr.intercept_.shape)
-print("X val samples shape", X_samples.shape)
-print(" -- "*20)
-print("Dec function shape", dec_func_lr.shape)
 
 
 # print("Predict Proba: ", y_probas)
@@ -169,7 +142,6 @@ print("Dec function shape", dec_func_lr.shape)
 # y_pred_sgd = sgd.predict(X_test_scaled)
 
 # acc_rf, cm_rf, f1_rf, recall_rf, precision_rf = get_scores(y_test, y_pred_rf)
-# acc_lr, cm_lr, f1_lr, recall_lr, precision_lr = get_scores(y_test, y_pred_lr)
 # acc_sgd, cm_sgd, f1_sgd, recall_sgd, precision_sgd = get_scores(y_test, y_pred_sgd)
 
 # params = {"model_type1": "rf",
