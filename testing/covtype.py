@@ -1,5 +1,6 @@
 from comet_ml import Experiment
 
+import datetime as dt
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.datasets import load_wine, load_breast_cancer, fetch_covtype
@@ -11,34 +12,24 @@ from sklearn.metrics import (accuracy_score,
     confusion_matrix, 
     recall_score, 
     precision_score, 
-    f1_score
+    f1_score,
+    log_loss,
+    roc_auc_score
 )
 
-from helpers import print_shapes, print_class_distribution
+from helpers import (
+    print_shapes,
+    print_class_distribution,
+    get_scores
+)
 from config import api_key
 
 # Setting the API key (saved as environment variable)
-# experiment = Experiment(
-#     api_key=api_key,
-#     project_name='covtype')
+experiment = Experiment(
+    api_key=api_key,
+    project_name='covtype')
 
 
-
-def get_scores(y_test, y_pred):
-    acc = accuracy_score(y_test, y_pred)
-    cm = confusion_matrix(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred, average='weighted')
-    recall = recall_score(y_test, y_pred, average='weighted')
-    precision = precision_score(y_test, y_pred, average='weighted')
-    return acc, cm, f1, recall, precision
-
-
-def print_scores(acc, cm, f1, recall, precision):
-    print("Accuracy: ", acc)
-    print("Confusion matrix: ", cm)
-    print("F1 score:", f1)
-    print("precision score:", precision)
-    print("recall score:", recall)
 
 
 random_state = 31
@@ -61,6 +52,8 @@ print("Target distribution: ", np.bincount(target) / len(target))
 
 sample_size = 100000
 test_size, val_size = 10000, 10000
+sample_size = 20000
+test_size, val_size = 2000, 2000
 
 _, X_train, _, y_train = train_test_split(data, target, stratify=target, test_size=sample_size, random_state=random_state)
 X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, stratify=y_train, test_size=test_size, random_state=random_state)
@@ -80,49 +73,93 @@ X_train_scaled = np.concatenate([X_train_scaled, X_train[:, 10:]], axis=1)
 X_val_scaled = np.concatenate([X_val_scaled, X_val[:, 10:]], axis=1)
 X_test_scaled = np.concatenate([X_test_scaled, X_test[:, 10:]], axis=1)
 
-lr = LogisticRegression()
+lr = LogisticRegression(warm_start=True, max_iter=1)
 
 
-grid_params_lr = {
-    # 'penalty': ['l1', 'l2'], 
-    # 'C': [0.001,0.01,0.1,1,10,100,1000]
-    'C': [1, 5, 10, 20, 50]
-}
+# grid_params_lr = {
+#     # 'penalty': ['l1', 'l2'], 
+#     # 'C': [0.001,0.01,0.1,1,10,100,1000]
+#     'C': [1, 5, 10, 20, 50]
+# }
 
-# init grid search for Logistic Regression
-grid_lr = GridSearchCV(lr, grid_params_lr)
-grid_lr.fit(X_train_scaled, y_train)
+# # init grid search for Logistic Regression
+# grid_lr = GridSearchCV(lr, grid_params_lr)
+# grid_lr.fit(X_train_scaled, y_train)
 
-print("Best LogReg params:", grid_lr.best_params_)
-best_lr = grid_lr.best_estimator_
-# print("Feature importances:", np.sort(best_lr.feature_importances_))
+# print("Best LogReg params:", grid_lr.best_params_)
+# best_lr = grid_lr.best_estimator_
+# # print("Feature importances:", np.sort(best_lr.feature_importances_))
 
-y_pred_lr = best_lr.predict(X_train_scaled)
-acc_lr, cm_lr, f1_lr, recall_lr, precision_lr = get_scores(y_train, y_pred_lr)
-print("Training scores")
-print_scores(acc_lr, cm_lr, f1_lr, recall_lr, precision_lr)
+# y_pred_lr = best_lr.predict(X_train_scaled)
+# acc_lr, cm_lr, f1_lr, recall_lr, precision_lr = get_scores(y_train, y_pred_lr)
+# print("Training scores")
+# print_scores(acc_lr, cm_lr, f1_lr, recall_lr, precision_lr)
 
-print(" -- "*25)
+# print(" -- "*25)
 
-y_pred_lr = best_lr.predict(X_val_scaled)
-acc_lr, cm_lr, f1_lr, recall_lr, precision_lr = get_scores(y_val, y_pred_lr)
-print("Validation scores")
-print_scores(acc_lr, cm_lr, f1_lr, recall_lr, precision_lr)
+# y_pred_lr = best_lr.predict(X_val_scaled)
+# acc_lr, cm_lr, f1_lr, recall_lr, precision_lr = get_scores(y_val, y_pred_lr)
+# print("Validation scores")
+# print_scores(acc_lr, cm_lr, f1_lr, recall_lr, precision_lr)
 
-rf = RandomForestClassifier(n_estimators=10, random_state=random_state)
-sgd = SGDClassifier(random_state=random_state)
-# n_epochs = 200
-# acc_train, acc_val = [], []
+# rf = RandomForestClassifier(n_estimators=10, random_state=random_state)
+# sgd = SGDClassifier(random_state=random_state)
 
-# for epoch in range(n_epochs):
-#     lr.fit(X_train_scaled, y_train)
-#     y_train_pred = lr.predict(X_train_scaled)
-#     y_val_pred = lr.predict(X_val_scaled)
-#     acc_train.append(accuracy_score(y_train, y_train_pred))
-#     acc_val.append(accuracy_score(y_val, y_val_pred))
+n_epochs = 100
+f1_train, f1_val = [], []
+acc_train, acc_val = [], []
+roc_train, roc_val = [], []
+loss_train, loss_val = [], []
 
-# plt.plot(acc_train)
-# plt.plot(acc_val)
+for epoch in range(n_epochs):
+    # before = dt.datetime.now()
+    lr.fit(X_train_scaled, y_train)
+    y_train_pred = lr.predict(X_train_scaled)
+    y_val_pred = lr.predict(X_val_scaled)
+    
+    acc_tr, _, f1_tr, recall_tr, precision_tr =  get_scores(y_train, y_train_pred)
+    acc_v, _, f1_v, recall_v, precision_v =  get_scores(y_val, y_val_pred)
+
+
+    y_probas_train = lr.predict_proba(X_train_scaled)
+    y_probas_val = lr.predict_proba(X_val_scaled)
+    loss_train.append(log_loss(y_train, y_probas_train))
+    loss_val.append(log_loss(y_val, y_probas_val))
+    # print(dt.datetime.now() - before)
+    
+    f1_train.append(f1_tr)
+    f1_val.append(f1_v)
+    acc_train.append(acc_tr)
+    acc_val.append(acc_v)
+    roc_train.append(roc_auc_score(y_train, y_probas_train, multi_class="ovo"))
+    roc_val.append(roc_auc_score(y_val, y_probas_val, multi_class="ovo"))
+    # f1_train.append(f1_tr)
+    # f1_val.append(f1_val)
+
+# experiment.log_asset_data(loss_train, name="train loss", epoch=range(n_epochs))
+experiment.log_curve("curves/train_loss", x=range(n_epochs), y=loss_train)
+experiment.log_curve("curves/val_loss", x=range(n_epochs), y=loss_val)
+experiment.log_curve("curves/train_f1", x=range(n_epochs), y=f1_train)
+experiment.log_curve("curves/val_f1", x=range(n_epochs), y=f1_val)
+experiment.log_curve("curves/train_acc", x=range(n_epochs), y=acc_train)
+experiment.log_curve("curves/val_acc", x=range(n_epochs), y=acc_val)
+experiment.log_curve("curves/train_roc", x=range(n_epochs), y=roc_train)
+experiment.log_curve("curves/val_roc", x=range(n_epochs), y=roc_val)
+experiment.end()
+
+# params = {"model_type2": "lg",
+#           "scaler": "standard scaler",
+#           "stratify": True
+#           }
+
+# plt.plot(loss_train, label = "train loss")
+# plt.plot(loss_val, label = "val loss")
+# plt.legend(loc="upper right")
+# plt.show()
+
+# plt.plot(f1_train, label = "train f1")
+# plt.plot(f1_val, label = "val f1")
+# plt.legend(loc="lower right")
 # plt.show()
 
 # print("Training random forest")
