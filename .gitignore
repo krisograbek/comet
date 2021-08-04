@@ -1,5 +1,6 @@
 venv
 .vscode
+models
 
 config.py
 matrix_pg.py

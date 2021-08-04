@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 from sklearn.metrics import (accuracy_score, 
     confusion_matrix, 
@@ -23,6 +25,7 @@ def print_class_distribution(y_train, y_val, y_test):
 
 
 def get_scores(y_test, y_pred, average="weighted"):
+    print("Returning Validation scores with average - ", average)
     acc = accuracy_score(y_test, y_pred)
     # cm = confusion_matrix(y_test, y_pred)
     precision = precision_score(y_test, y_pred, average=average)
@@ -66,6 +69,17 @@ def get_learning_curves(estimator, X_train, X_val, y_train, y_val, n_epochs = 10
         acc_val.append(acc_v)
         roc_train.append(roc_auc_score(y_train, y_probas_train, multi_class="ovo"))
         roc_val.append(roc_auc_score(y_val, y_probas_val, multi_class="ovo"))
+
+
+    plt.plot(loss_train, label = "train loss")
+    plt.plot(loss_val, label = "val loss")
+    plt.legend(loc="upper right")
+    plt.show()
+
+    plt.plot(f1_train, label = "train f1")
+    plt.plot(f1_val, label = "val f1")
+    plt.legend(loc="lower right")
+    plt.show()
 
 def log_learning_curve(experiment, dirname, curve_type, n_epochs, y_type):
     data_path = dirname + "/" + curve_type

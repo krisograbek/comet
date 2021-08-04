@@ -1,7 +1,7 @@
 from comet_ml import Experiment
 
-import json
 import pprint
+import pickle
 import datetime as dt
 import numpy as np
 import matplotlib.pyplot as plt
@@ -75,24 +75,103 @@ X_train_scaled = np.concatenate([X_train_scaled, X_train[:, 10:]], axis=1)
 X_val_scaled = np.concatenate([X_val_scaled, X_val[:, 10:]], axis=1)
 X_test_scaled = np.concatenate([X_test_scaled, X_test[:, 10:]], axis=1)
 
-lr = LogisticRegression(C=100)
 
-lr.fit(X_train_scaled, y_train)
-y_pred = lr.predict(X_val_scaled)
+#####  METRICS  #####
 
-print("Actual classes: ", np.bincount(y_val))
-print("Predicted classes: ", np.bincount(y_pred))
+# lr = LogisticRegression(C=100)
+
+# lr.fit(X_train_scaled, y_train)
+# y_pred = lr.predict(X_val_scaled)
+
+# print("Actual classes: ", np.bincount(y_val))
+# print("Predicted classes: ", np.bincount(y_pred))
+
+# # average parameter for multiclass
+# average = "weighted"
+# acc, prec, recall, f1 = get_scores(y_val, y_pred, average=average)
+# print(average, " scores: ")
+# print_scores(acc, prec, recall, f1)
+
+# weights_val = np.bincount(y_val) / len(y_val)
+# cm = confusion_matrix(y_val, y_pred)
+# compute_scores(cm, average=average, weights=weights_val)
 
 
-average = "micro"
+#####  METRICS  #####
 
-acc, prec, recall, f1 = get_scores(y_val, y_pred, average=average)
-print(average, " scores: ")
-print_scores(acc, prec, recall, f1)
 
-weights_val = np.bincount(y_val) / len(y_val)
-cm = confusion_matrix(y_val, y_pred)
-compute_scores(cm, average=average, weights=weights_val)
+#####  HYPERPARAMETER TUNING  ###########
+
+
+rf = RandomForestClassifier()
+sgd = SGDClassifier()
+lr = LogisticRegression()
+
+average = "macro"
+
+if False:
+
+    param_random = {
+        'n_estimators': [5, 10, 20, 50, 100, 200],
+        'max_depth': [3, 7, 15, 25, 50, None],
+        'max_features': ['auto', 'sqrt'],
+        'min_samples_leaf': [1, 2, 4],
+        'min_samples_split': [2, 5, 10],
+        'bootstrap': [True, False]
+    }
+
+
+    f1 = make_scorer(f1_score, average=average)
+    prec = make_scorer(precision_score, average=average)
+    recall = make_scorer(recall_score, average=average)
+
+    scoring = {
+        "f1": f1,
+        "precision": prec,
+        "recall": recall
+    }
+
+    rnd = RandomizedSearchCV(rf,
+                        param_distributions=param_random,
+                        cv=5,
+                        n_iter=20,
+                        random_state=random_state,
+                        scoring=scoring,
+                        refit="f1",
+                        n_jobs=-1)
+
+
+    rnd.fit(X_train_scaled, y_train)
+
+    best_params_rf = rnd.best_params_
+    best_rf = rnd.best_estimator_
+
+    print("Best params Random Forest:", best_params_rf)
+
+
+
+    with open("models/best_rf.pkl", "wb") as f:
+        pickle.dump(best_rf, f)
+
+    pp = pprint.PrettyPrinter(indent=4)
+    mean_f1 = rnd.cv_results_["mean_test_f1"]
+    mean_precision = rnd.cv_results_["mean_test_precision"]
+    mean_recall = rnd.cv_results_["mean_test_recall"]
+
+    print("Mean F1: ", mean_f1)
+    print("Mean precision: ", mean_precision)
+    print("Mean recall: ", mean_recall)
+
+else:
+    with open("models/best_rf.pkl", "rb") as f:
+        best_rf = pickle.load(f)
+
+y_pred_rf = best_rf.predict(X_val_scaled)
+
+acc_rf, prec_rf, recall_rf, f1_rf = get_scores(y_val, y_pred_rf, average=average)
+print_scores(acc_rf, prec_rf, recall_rf, f1_rf)
+
+print(best_rf.get_params())
 
 
 
@@ -101,19 +180,6 @@ compute_scores(cm, average=average, weights=weights_val)
 #     'C': [0.01, 0.1, 1, 10, 100]
 #     # 'max_iter': np.linspace(100, 500, 3)
 # }
-
-# average = "micro"
-
-# f1 = make_scorer(f1_score, average=average)
-# prec = make_scorer(precision_score, average=average)
-# recall = make_scorer(recall_score, average=average)
-
-# scoring = {
-#     "f1": f1,
-#     "precision": prec,
-#     "recall": recall
-# }
-
 # # init grid search for Logistic Regression
 # grid_lr = GridSearchCV(lr, grid_params_lr, scoring=scoring, refit="f1", n_jobs=-1)
 # before = dt.datetime.now()
@@ -143,10 +209,8 @@ compute_scores(cm, average=average, weights=weights_val)
 # y_pred_lr = best_lr.predict(X_val_scaled)
 # acc_lr, cm_lr, f1_lr, recall_lr, precision_lr = get_scores(y_val, y_pred_lr)
 # print("Validation scores")
-# # print_scores(acc_lr, cm_lr, f1_lr, recall_lr, precision_lr)
+# print_scores(acc_lr, cm_lr, f1_lr, recall_lr, precision_lr)
 
-# rf = RandomForestClassifier(n_estimators=10, random_state=random_state)
-# sgd = SGDClassifier(random_state=random_state)
 
 
 # log_learning_curve(experiment, "loss", "loss_train", n_epochs, loss_train)
@@ -158,31 +222,19 @@ compute_scores(cm, average=average, weights=weights_val)
 #           "stratify": True
 #           }
 
-# plt.plot(loss_train, label = "train loss")
-# plt.plot(loss_val, label = "val loss")
-# plt.legend(loc="upper right")
-# plt.show()
-
-# plt.plot(f1_train, label = "train f1")
-# plt.plot(f1_val, label = "val f1")
-# plt.legend(loc="lower right")
-# plt.show()
-
-# print("Training random forest")
-# rf.fit(X_train_scaled, y_train)
-# y_pred_rf = rf.predict(X_test_scaled)
-# y_probas_rf = rf.predict(X_test_scaled)
-
-
-
-# print("Predict Proba: ", y_probas)
-# print("Sum Predict Proba: ", np.sum(y_probas))
-# print("Predict log Proba: ", y_probas_log)
-# print("Predict proba np.log: ", np.log(lr.predict_proba(X_samples)))
 
 # print("Training SGD Classifier")
 # sgd.fit(X_train_scaled, y_train)
 # y_pred_sgd = sgd.predict(X_test_scaled)
+
+
+
+
+#####  HYPERPARAMETER TUNING  ###########
+
+
+
+
 
 # acc_rf, cm_rf, f1_rf, recall_rf, precision_rf = get_scores(y_test, y_pred_rf)
 # acc_sgd, cm_sgd, f1_sgd, recall_sgd, precision_sgd = get_scores(y_test, y_pred_sgd)
