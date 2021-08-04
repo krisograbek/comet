@@ -1,8 +1,11 @@
 from comet_ml import Experiment
 
+import json
+import pprint
 import datetime as dt
 import numpy as np
 import matplotlib.pyplot as plt
+from numpy.lib.function_base import average
 from sklearn.datasets import load_wine, load_breast_cancer, fetch_covtype
 from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV, cross_val_score
 from sklearn.preprocessing import StandardScaler
@@ -14,23 +17,24 @@ from sklearn.metrics import (accuracy_score,
     precision_score, 
     f1_score,
     log_loss,
-    roc_auc_score
+    roc_auc_score,
+    make_scorer
 )
 
 from helpers import (
     print_shapes,
     print_class_distribution,
-    get_scores
+    get_scores,
+    print_scores,
+    log_learning_curve
 )
+from utils_numpy import compute_scores
 from config import api_key
 
 # Setting the API key (saved as environment variable)
-experiment = Experiment(
-    api_key=api_key,
-    project_name='covtype')
-
-
-
+# experiment = Experiment(
+#     api_key=api_key,
+#     project_name='covtype')
 
 random_state = 31
 
@@ -64,8 +68,6 @@ print_class_distribution(y_train, y_val, y_test)
 
 scaler = StandardScaler()
 
-# print(X_train[:3])
-
 X_train_scaled = scaler.fit_transform(X_train[:, :10])
 X_val_scaled = scaler.transform(X_val[:, :10])
 X_test_scaled = scaler.transform(X_test[:, :10])
@@ -73,79 +75,83 @@ X_train_scaled = np.concatenate([X_train_scaled, X_train[:, 10:]], axis=1)
 X_val_scaled = np.concatenate([X_val_scaled, X_val[:, 10:]], axis=1)
 X_test_scaled = np.concatenate([X_test_scaled, X_test[:, 10:]], axis=1)
 
-lr = LogisticRegression(warm_start=True, max_iter=1)
+lr = LogisticRegression(C=100)
+
+lr.fit(X_train_scaled, y_train)
+y_pred = lr.predict(X_val_scaled)
+
+print("Actual classes: ", np.bincount(y_val))
+print("Predicted classes: ", np.bincount(y_pred))
+
+
+average = "micro"
+
+acc, prec, recall, f1 = get_scores(y_val, y_pred, average=average)
+print(average, " scores: ")
+print_scores(acc, prec, recall, f1)
+
+weights_val = np.bincount(y_val) / len(y_val)
+cm = confusion_matrix(y_val, y_pred)
+compute_scores(cm, average=average, weights=weights_val)
+
 
 
 # grid_params_lr = {
-#     # 'penalty': ['l1', 'l2'], 
 #     # 'C': [0.001,0.01,0.1,1,10,100,1000]
-#     'C': [1, 5, 10, 20, 50]
+#     'C': [0.01, 0.1, 1, 10, 100]
+#     # 'max_iter': np.linspace(100, 500, 3)
+# }
+
+# average = "micro"
+
+# f1 = make_scorer(f1_score, average=average)
+# prec = make_scorer(precision_score, average=average)
+# recall = make_scorer(recall_score, average=average)
+
+# scoring = {
+#     "f1": f1,
+#     "precision": prec,
+#     "recall": recall
 # }
 
 # # init grid search for Logistic Regression
-# grid_lr = GridSearchCV(lr, grid_params_lr)
+# grid_lr = GridSearchCV(lr, grid_params_lr, scoring=scoring, refit="f1", n_jobs=-1)
+# before = dt.datetime.now()
 # grid_lr.fit(X_train_scaled, y_train)
-
+# print("Training time: ", dt.datetime.now() - before)
 # print("Best LogReg params:", grid_lr.best_params_)
+
+# pp = pprint.PrettyPrinter(indent=4)
+# pp.pprint(grid_lr.cv_results_)
+
+# scores = grid_lr.cv_results_['mean_test_score']
+# params = grid_lr.cv_results_['params']
+
+# for score, param in zip(scores, params):
+#     print("param: {} - score: {} ".format(param, score))
+    
 # best_lr = grid_lr.best_estimator_
 # # print("Feature importances:", np.sort(best_lr.feature_importances_))
 
 # y_pred_lr = best_lr.predict(X_train_scaled)
 # acc_lr, cm_lr, f1_lr, recall_lr, precision_lr = get_scores(y_train, y_pred_lr)
 # print("Training scores")
-# print_scores(acc_lr, cm_lr, f1_lr, recall_lr, precision_lr)
+# # print_scores(acc_lr, cm_lr, f1_lr, recall_lr, precision_lr)
 
 # print(" -- "*25)
 
 # y_pred_lr = best_lr.predict(X_val_scaled)
 # acc_lr, cm_lr, f1_lr, recall_lr, precision_lr = get_scores(y_val, y_pred_lr)
 # print("Validation scores")
-# print_scores(acc_lr, cm_lr, f1_lr, recall_lr, precision_lr)
+# # print_scores(acc_lr, cm_lr, f1_lr, recall_lr, precision_lr)
 
 # rf = RandomForestClassifier(n_estimators=10, random_state=random_state)
 # sgd = SGDClassifier(random_state=random_state)
 
-n_epochs = 100
-f1_train, f1_val = [], []
-acc_train, acc_val = [], []
-roc_train, roc_val = [], []
-loss_train, loss_val = [], []
 
-for epoch in range(n_epochs):
-    # before = dt.datetime.now()
-    lr.fit(X_train_scaled, y_train)
-    y_train_pred = lr.predict(X_train_scaled)
-    y_val_pred = lr.predict(X_val_scaled)
-    
-    acc_tr, _, f1_tr, recall_tr, precision_tr =  get_scores(y_train, y_train_pred)
-    acc_v, _, f1_v, recall_v, precision_v =  get_scores(y_val, y_val_pred)
+# log_learning_curve(experiment, "loss", "loss_train", n_epochs, loss_train)
 
 
-    y_probas_train = lr.predict_proba(X_train_scaled)
-    y_probas_val = lr.predict_proba(X_val_scaled)
-    loss_train.append(log_loss(y_train, y_probas_train))
-    loss_val.append(log_loss(y_val, y_probas_val))
-    # print(dt.datetime.now() - before)
-    
-    f1_train.append(f1_tr)
-    f1_val.append(f1_v)
-    acc_train.append(acc_tr)
-    acc_val.append(acc_v)
-    roc_train.append(roc_auc_score(y_train, y_probas_train, multi_class="ovo"))
-    roc_val.append(roc_auc_score(y_val, y_probas_val, multi_class="ovo"))
-    # f1_train.append(f1_tr)
-    # f1_val.append(f1_val)
-
-# experiment.log_asset_data(loss_train, name="train loss", epoch=range(n_epochs))
-experiment.log_curve("curves/train_loss", x=range(n_epochs), y=loss_train)
-experiment.log_curve("curves/val_loss", x=range(n_epochs), y=loss_val)
-experiment.log_curve("curves/train_f1", x=range(n_epochs), y=f1_train)
-experiment.log_curve("curves/val_f1", x=range(n_epochs), y=f1_val)
-experiment.log_curve("curves/train_acc", x=range(n_epochs), y=acc_train)
-experiment.log_curve("curves/val_acc", x=range(n_epochs), y=acc_val)
-experiment.log_curve("curves/train_roc", x=range(n_epochs), y=roc_train)
-experiment.log_curve("curves/val_roc", x=range(n_epochs), y=roc_val)
-experiment.end()
 
 # params = {"model_type2": "lg",
 #           "scaler": "standard scaler",
