@@ -1,8 +1,10 @@
 venv
 .vscode
+models
 
 config.py
 matrix_pg.py
+pg.py
 np_predicts.py
 
 __pycache__
