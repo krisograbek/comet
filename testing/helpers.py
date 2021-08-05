@@ -27,11 +27,11 @@ def print_class_distribution(y_train, y_val, y_test):
 def get_scores(y_test, y_pred, average="weighted"):
     print("Returning Validation scores with average - ", average)
     acc = accuracy_score(y_test, y_pred)
-    # cm = confusion_matrix(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred)
     precision = precision_score(y_test, y_pred, average=average)
     recall = recall_score(y_test, y_pred, average=average)
     f1 = f1_score(y_test, y_pred, average=average)
-    return acc, precision, recall, f1
+    return acc, precision, recall, f1, cm
 
 
 def print_scores(acc, precision, recall, f1):
