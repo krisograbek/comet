@@ -27,15 +27,16 @@ from helpers import (
     print_class_distribution,
     get_scores,
     print_scores,
-    log_learning_curve
+    log_learning_curve,
+    get_grid
 )
 from utils_numpy import compute_scores
 from config import api_key
 
 # Setting the API key (saved as environment variable)
-experiment = Experiment(
-    api_key=api_key,
-    project_name='covtype')
+# experiment = Experiment(
+#     api_key=api_key,
+#     project_name='covtype')
 
 random_state = 31
 
@@ -96,6 +97,42 @@ X_test_scaled = np.concatenate([X_test_scaled, X_test[:, 10:]], axis=1)
 # weights_val = np.bincount(y_val) / len(y_val)
 # cm = confusion_matrix(y_val, y_pred)
 # compute_scores(cm, average=average, weights=weights_val)
+
+
+
+
+avgs = ["micro", "macro", "weighted"]
+estimators = [LogisticRegression(), KNeighborsClassifier()]
+estimators = [KNeighborsClassifier()]
+for avg in avgs:
+    for i, est in enumerate(estimators):
+        print(" -- " * 25)
+        print("Training with parameters. Estimator: ", est, "average: ", avg)
+        # if i == 0:
+        #     param_grid = {
+        #         'C': [0.1, 1, 10, 100],
+        #         'max_iter': np.linspace(100, 500, 3)
+        #     }
+        # else:
+        param_grid = { 'n_neighbors':[1,3,5],
+            'leaf_size':[1,3,5],
+            # 'algorithm':['auto', 'kd_tree'],
+            'metric': ['euclidean', 'manhattan', 'minkowski']
+        }
+        grid = get_grid(est, param_grid, avg)
+        grid.fit(X_train_scaled, y_train)
+        y_pred_rf = grid.predict(X_val_scaled)
+        print("Scores for average: ", avg)
+        acc_rf, precision_rf, recall_rf, f1_rf, cm_rf = get_scores(y_val, y_pred_rf, average=avg)
+        print_scores(acc_rf, precision_rf, recall_rf, f1_rf)
+        print("Scores for average: weighted")
+        acc_rf, precision_rf, recall_rf, f1_rf, cm_rf = get_scores(y_val, y_pred_rf, average="weighted")
+        print_scores(acc_rf, precision_rf, recall_rf, f1_rf)
+        print("Best params: ", grid.best_params_)
+
+
+assert False
+
 
 
 #####  METRICS  #####
@@ -372,6 +409,7 @@ experiment.log_parameters(params)
 #            }
 
 # experiment.log_metrics(metrics)
+# experiment.log_confusion_matrix(matrix=cm_rf, file_name="cm_rf.json")
 # experiment.log_confusion_matrix(matrix=cm_rf, file_name="cm_rf.json")
 # experiment.log_parameters(params)
 

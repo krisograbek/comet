@@ -1,16 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-
+from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import (accuracy_score, 
     confusion_matrix, 
     recall_score, 
     precision_score, 
     f1_score,
     log_loss,
-    roc_auc_score
+    roc_auc_score,
+    make_scorer
 )
 
+
+def get_grid(estimator, params, average):
+    scoring = {"f1": make_scorer(f1_score, average=average)}
+    grid = GridSearchCV(estimator, param_grid=params, scoring=scoring, refit="f1", n_jobs=-1)
+    return grid
 
 def print_shapes(X_train, y_train, X_val, y_val, X_test, y_test):
     print("Train shapes - data: {}, target: {}".format(X_train.shape, y_train.shape))

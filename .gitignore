@@ -6,5 +6,6 @@ config.py
 matrix_pg.py
 pg.py
 np_predicts.py
+compare_avgs.py
 
 __pycache__
