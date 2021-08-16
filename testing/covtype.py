@@ -104,12 +104,12 @@ X_test_scaled = np.concatenate([X_test_scaled, X_test[:, 10:]], axis=1)
 #####  HYPERPARAMETER TUNING  ###########
 
 
-average = "macro"
 # sgd = SGDClassifier()
 rf = RandomForestClassifier()
 lr = LogisticRegression()
 knn = KNeighborsClassifier()
 
+average = "macro"
 f1 = make_scorer(f1_score, average=average)
 prec = make_scorer(precision_score, average=average)
 recall = make_scorer(recall_score, average=average)
@@ -126,6 +126,11 @@ fit_time_knn = 0
 n_iter = 25
 
 train_mode = False
+
+####  RANDOM FOREST  ####
+
+print(" -- "*25)
+print("####  RANDOM FOREST  ####")
 
 if train_mode is True:
     print( "Training Random Forest")
